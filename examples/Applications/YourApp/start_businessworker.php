@@ -18,6 +18,7 @@ use \GatewayWorker\BusinessWorker;
 include __DIR__ . '/Events.php';
 
 // 自动加载类
+require_once __DIR__ . '/../GatewayProtocol.php';
 require_once __DIR__ . '/../../autoload.inc';
 
 // bussinessWorker 进程

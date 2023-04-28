@@ -16,6 +16,7 @@ use \GatewayWorker\Gateway;
 use \GatewayWorker\BusinessWorker;
 
 // 自动加载类
+require_once __DIR__ . '/../GatewayProtocol.php';
 require_once __DIR__ . '/../../autoload.inc';
 
 // gateway 进程，这里使用Text协议，可以用telnet测试

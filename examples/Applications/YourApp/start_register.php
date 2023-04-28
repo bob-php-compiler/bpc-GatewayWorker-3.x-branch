@@ -15,6 +15,7 @@ use \Workerman\Worker;
 use \GatewayWorker\Register;
 
 // 自动加载类
+require_once __DIR__ . '/../GatewayProtocol.php';
 require_once __DIR__ . '/../../autoload.inc';
 
 // register 必须是text协议

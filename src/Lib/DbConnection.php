@@ -1797,7 +1797,7 @@ class DbConnection
     {
         if (empty($this->parameters) && is_array($parray)) {
             $columns = array_keys($parray);
-            foreach ($columns as $i => &$column) {
+            foreach ($columns as $column) {
                 $this->bind($column, $parray[$column]);
             }
         }

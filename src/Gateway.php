@@ -20,8 +20,7 @@ use Workerman\Connection\TcpConnection;
 
 use Workerman\Worker;
 use Workerman\Timer;
-use Workerman\Autoloader;
-use Workerman\Connection\AsyncTcpConnection;
+use Workerman\Connection\SyncTcpConnection;
 use GatewayWorker\Protocols\GatewayProtocol;
 
 /**
@@ -63,7 +62,7 @@ class Gateway extends Worker
      *
      */
     public $innerTcpWorkerListen='';
-	
+
     /**
      * 本机端口
      *
@@ -112,7 +111,7 @@ class Gateway extends Worker
      * @var string
      */
     public $pingData = '';
-    
+
     /**
      * 秘钥
      *
@@ -244,7 +243,7 @@ class Gateway extends Worker
      * @var int
      */
     protected $_gatewayPort = 0;
-    
+
     /**
      * connectionId 记录器
      * @var int
@@ -269,9 +268,6 @@ class Gateway extends Worker
         parent::__construct($socket_name, $context_option);
 		$this->_gatewayPort = substr(strrchr($socket_name,':'),1);
         $this->router = array("\\GatewayWorker\\Gateway", 'routerBind');
-
-        $backtrace               = debug_backtrace();
-        $this->_autoloadRootPath = dirname($backtrace[0]['file']);
     }
 
     /**
@@ -394,7 +390,7 @@ class Gateway extends Worker
         }
         $this->sendToWorker(GatewayProtocol::CMD_ON_WEBSOCKET_CONNECT, $connection, $data);
     }
-    
+
     /**
      * 生成connection id
      * @return int
@@ -536,13 +532,9 @@ class Gateway extends Worker
             Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, array($this, 'pingBusinessWorker'));
         }
 
-        if (!class_exists('\Protocols\GatewayProtocol')) {
-            class_alias('GatewayWorker\Protocols\GatewayProtocol', 'Protocols\GatewayProtocol');
-        }
-
          //如为公网IP监听，直接换成0.0.0.0 ，否则用内网IP
         $listen_ip=filter_var($this->lanIp,FILTER_VALIDATE_IP,FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)?'0.0.0.0':$this->lanIp;
-	    
+
 	    //Use scenario to see line 64
         if($this->innerTcpWorkerListen != '') {
             $listen_ip = $this->innerTcpWorkerListen;
@@ -553,10 +545,6 @@ class Gateway extends Worker
         $this->_innerTcpWorker->reusePort = false;
         $this->_innerTcpWorker->listen();
         $this->_innerTcpWorker->name = 'GatewayInnerWorker';
-
-        if ($this->_autoloadRootPath && class_exists(Autoloader::class)) {
-            Autoloader::setRootPath($this->_autoloadRootPath);
-        }
 
         // 设置内部监听的相关回调
         $this->_innerTcpWorker->onMessage = array($this, 'onWorkerMessage');
@@ -997,15 +985,15 @@ class Gateway extends Worker
     {
         $address = $this->lanIp . ':' . $this->lanPort;
         foreach ($this->registerAddress as $register_address) {
-            $register_connection = new AsyncTcpConnection("text://{$register_address}");
+            $register_connection = new SyncTcpConnection("text://{$register_address}");
             $secret_key = $this->secretKey;
             $register_connection->onConnect = function($register_connection) use ($address, $secret_key, $register_address){
                 $register_connection->send('{"event":"gateway_connect", "address":"' . $address . '", "secret_key":"' . $secret_key . '"}');
                 // 如果Register服务器不在本地服务器，则需要保持心跳
                 if (strpos($register_address, '127.0.0.1') !== 0) {
-                    $register_connection->ping_timer = Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, function () use ($register_connection) {
+                    $register_connection->ping_timer = Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, function ($register_connection) {
                         $register_connection->send('{"event":"ping"}');
-                    });
+                    }, $register_connection);
                 }
             };
             $register_connection->onClose = function ($register_connection) {

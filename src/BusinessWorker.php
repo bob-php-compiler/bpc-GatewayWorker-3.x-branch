@@ -18,7 +18,7 @@ use Workerman\Connection\TcpConnection;
 
 use Workerman\Worker;
 use Workerman\Timer;
-use Workerman\Connection\AsyncTcpConnection;
+use Workerman\Connection\SyncTcpConnection;
 use GatewayWorker\Protocols\GatewayProtocol;
 use GatewayWorker\Lib\Context;
 
@@ -79,7 +79,7 @@ class BusinessWorker extends Worker
      * @var callable|null
      */
     protected $_onWorkerReload = null;
-    
+
     /**
      * 保存用户设置的 workerStop 回调
      *
@@ -90,7 +90,7 @@ class BusinessWorker extends Worker
     /**
      * 到注册中心的连接
      *
-     * @var AsyncTcpConnection
+     * @var SyncTcpConnection
      */
     protected $_registerConnection = null;
 
@@ -195,10 +195,6 @@ class BusinessWorker extends Worker
             opcache_reset();
         }
 
-        if (!class_exists('\Protocols\GatewayProtocol')) {
-            class_alias('GatewayWorker\Protocols\GatewayProtocol', 'Protocols\GatewayProtocol');
-        }
-
         if (!is_array($this->registerAddress)) {
             $this->registerAddress = array($this->registerAddress);
         }
@@ -209,28 +205,33 @@ class BusinessWorker extends Worker
         if ($this->_onWorkerStart) {
             call_user_func($this->_onWorkerStart, $this);
         }
-        
-        if (is_callable($this->eventHandler . '::onWorkerStart')) {
-            call_user_func($this->eventHandler . '::onWorkerStart', $this);
+
+        $callback = array($this->eventHandler, 'onWorkerStart');
+        if (is_callable($callback)) {
+            call_user_func($callback, $this);
         }
 
         // 设置回调
-        if (is_callable($this->eventHandler . '::onConnect')) {
-            $this->_eventOnConnect = $this->eventHandler . '::onConnect';
+        $callback = array($this->eventHandler, 'onConnect');
+        if (is_callable($callback)) {
+            $this->_eventOnConnect = $callback;
         }
 
-        if (is_callable($this->eventHandler . '::onMessage')) {
-            $this->_eventOnMessage = $this->eventHandler . '::onMessage';
+        $callback = array($this->eventHandler, 'onMessage');
+        if (is_callable($callback)) {
+            $this->_eventOnMessage = $callback;
         } else {
             echo "Waring: {$this->eventHandler}::onMessage is not callable\n";
         }
 
-        if (is_callable($this->eventHandler . '::onClose')) {
-            $this->_eventOnClose = $this->eventHandler . '::onClose';
+        $callback = array($this->eventHandler, 'onClose');
+        if (is_callable($callback)) {
+            $this->_eventOnClose = $callback;
         }
 
-        if (is_callable($this->eventHandler . '::onWebSocketConnect')) {
-            $this->_eventOnWebSocketConnect = $this->eventHandler . '::onWebSocketConnect';
+        $callback = array($this->eventHandler, 'onWebSocketConnect');
+        if (is_callable($callback)) {
+            $this->_eventOnWebSocketConnect = $callback;
         }
 
     }
@@ -251,7 +252,7 @@ class BusinessWorker extends Worker
             call_user_func($this->_onWorkerReload, $this);
         }
     }
-    
+
     /**
      * 当进程关闭时一些清理工作
      *
@@ -262,28 +263,29 @@ class BusinessWorker extends Worker
         if ($this->_onWorkerStop) {
             call_user_func($this->_onWorkerStop, $this);
         }
-        if (is_callable($this->eventHandler . '::onWorkerStop')) {
-            call_user_func($this->eventHandler . '::onWorkerStop', $this);
+        $callback = array($this->eventHandler, 'onWorkerStop');
+        if (is_callable($callback)) {
+            call_user_func($callback, $this);
         }
     }
 
     /**
      * 连接服务注册中心
-     * 
+     *
      * @return void
      */
     public function connectToRegister()
     {
         foreach ($this->registerAddress as $register_address) {
-            $register_connection = new AsyncTcpConnection("text://{$register_address}");
+            $register_connection = new SyncTcpConnection("text://{$register_address}");
             $secret_key = $this->secretKey;
-            $register_connection->onConnect = function () use ($register_connection, $secret_key, $register_address) {
+            $register_connection->onConnect = function ($register_connection) use ($secret_key, $register_address) {
                 $register_connection->send('{"event":"worker_connect","secret_key":"' . $secret_key . '"}');
                 // 如果Register服务器不在本地服务器，则需要保持心跳
                 if (strpos($register_address, '127.0.0.1') !== 0) {
-                    $register_connection->ping_timer = Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, function () use ($register_connection) {
+                    $register_connection->ping_timer = Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, function ($register_connection) {
                         $register_connection->send('{"event":"ping"}');
-                    });
+                    }, $register_connection);
                 }
             };
             $register_connection->onClose = function ($register_connection) {
@@ -397,7 +399,7 @@ class BusinessWorker extends Worker
                 }
                 break;
         }
-        
+
         // session 必须是数组
         if ($_SESSION !== null && !is_array($_SESSION)) {
             throw new \Exception('$_SESSION must be an array. But $_SESSION=' . var_export($_SESSION, true) . ' is not array.');
@@ -437,7 +439,7 @@ class BusinessWorker extends Worker
     public function tryToConnectGateway($addr)
     {
         if (!isset($this->gatewayConnections[$addr]) && !isset($this->_connectingGatewayAddresses[$addr]) && isset($this->_gatewayAddresses[$addr])) {
-            $gateway_connection                    = new AsyncTcpConnection("GatewayProtocol://$addr");
+            $gateway_connection                    = new SyncTcpConnection("GatewayProtocol://$addr");
             $gateway_connection->remoteAddr        = $addr;
             $gateway_connection->onConnect         = array($this, 'onConnectGateway');
             $gateway_connection->onMessage         = array($this, 'onGatewayMessage');
@@ -450,7 +452,7 @@ class BusinessWorker extends Worker
             $gateway_data         = GatewayProtocol::$empty;
             $gateway_data['cmd']  = GatewayProtocol::CMD_WORKER_CONNECT;
             $gateway_data['body'] = json_encode(array(
-                'worker_key' =>"{$this->name}:{$this->id}", 
+                'worker_key' =>"{$this->name}:{$this->id}",
                 'secret_key' => $this->secretKey,
             ));
             $gateway_connection->send($gateway_data);

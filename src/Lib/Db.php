@@ -13,7 +13,6 @@
  */
 namespace GatewayWorker\Lib;
 
-use Config\Db as DbConfig;
 use Exception;
 
 /**
@@ -21,6 +20,8 @@ use Exception;
  */
 class Db
 {
+    public static $dbConfigClass = 'DbConfig';
+
     /**
      * 实例数组
      *
@@ -37,13 +38,14 @@ class Db
      */
     public static function instance($config_name)
     {
-        if (!isset(DbConfig::$$config_name)) {
-            echo "\\Config\\Db::$config_name not set\n";
-            throw new Exception("\\Config\\Db::$config_name not set\n");
+        if (!isset(static::$dbConfigClass::$$config_name)) {
+            $msg = static::$dbConfigClass . "::$config_name not set";
+            echo $msg, "\n";
+            throw new Exception($msg);
         }
 
         if (empty(self::$instance[$config_name])) {
-            $config                       = DbConfig::$$config_name;
+            $config                       = static::$dbConfigClass::$$config_name;
             self::$instance[$config_name] = new DbConnection($config['host'], $config['port'],
                 $config['user'], $config['password'], $config['dbname'],$config['charset']);
         }
