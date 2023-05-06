@@ -1717,6 +1717,9 @@ class DbConnection
     */
     public function closeConnection()
     {
+        if (defined('__BPC__')) {
+            $this->pdo->closeConnection();
+        }
         $this->pdo = null;
     }
 
