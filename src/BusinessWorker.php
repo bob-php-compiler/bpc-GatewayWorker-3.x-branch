@@ -158,19 +158,6 @@ class BusinessWorker extends Worker
     const PERSISTENCE_CONNECTION_PING_INTERVAL = 25;
 
     /**
-     * 构造函数
-     *
-     * @param string $socket_name
-     * @param array  $context_option
-     */
-    public function __construct($socket_name = '', $context_option = array())
-    {
-        parent::__construct($socket_name, $context_option);
-        $backrace                = debug_backtrace();
-        $this->_autoloadRootPath = dirname($backrace[0]['file']);
-    }
-
-    /**
      * {@inheritdoc}
      */
     public function run()
