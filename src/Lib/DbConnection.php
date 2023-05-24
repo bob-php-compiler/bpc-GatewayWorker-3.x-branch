@@ -1732,6 +1732,15 @@ class DbConnection
      */
     protected function execute($query, $parameters = "")
     {
+        // bpc需要手动destroy pdo stmt,不然就只能等到程序结束了
+        // 对于gatewayworker这种长时间运行的程序来说,要即时清理
+        if (defined('__BPC__')) {
+            if ($this->sQuery) {
+                $this->sQuery->destroy();
+                $this->sQuery = null;
+            }
+        }
+
         try {
             $this->sQuery = @$this->pdo->prepare($query);
             $this->bindMore($parameters);
@@ -1746,6 +1755,14 @@ class DbConnection
             }
             $this->success = $this->sQuery->execute();
         } catch (PDOException $e) {
+            // bpc需要手动destroy pdo stmt,不然就只能等到程序结束了
+            // 对于gatewayworker这种长时间运行的程序来说,要即时清理
+            if (defined('__BPC__')) {
+                if ($this->sQuery) {
+                    $this->sQuery->destroy();
+                    $this->sQuery = null;
+                }
+            }
             // 服务端断开时重连一次
             if (isset($e->errorInfo[1]) && ($e->errorInfo[1] == 2006 || $e->errorInfo[1] == 2013)) {
                 $this->closeConnection();
@@ -1763,6 +1780,16 @@ class DbConnection
                     $this->success = $this->sQuery->execute();
                 } catch (PDOException $ex) {
                     $this->rollBackTrans();
+
+                    // bpc需要手动destroy pdo stmt,不然就只能等到程序结束了
+                    // 对于gatewayworker这种长时间运行的程序来说,要即时清理
+                    if (defined('__BPC__')) {
+                        if ($this->sQuery) {
+                            $this->sQuery->destroy();
+                            $this->sQuery = null;
+                        }
+                    }
+
                     throw $ex;
                 }
             } else {
