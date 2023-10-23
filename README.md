@@ -1,3 +1,11 @@
+# BPC Notes: How to make?
+
+```shell
+cd src/
+make && sudo make install-libgatewayworker
+sudo ldconfig
+```
+
 GatewayWorker 
 =================
 
