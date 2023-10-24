@@ -1,6 +1,6 @@
 libgatewayworker_u-4.4a.so:
 	./bpc-prepare.sh
-	$(MAKE) -C ../GatewayWorker libgatwayworker
+	$(MAKE) -C ../GatewayWorker libgatewayworker
 
 libgatewayworker:
 	bpc -v \
